@@ -22,3 +22,5 @@ html.overlay-root,html.overlay-root body,html.overlay-root #app{background:trans
 
 /* Compact application chrome; technical explanations live in docs/. */
 .shell>aside{padding-top:28px}.shell nav{margin-top:28px}.page-header{margin-bottom:24px;min-height:0}.page-header h1{font-size:24px;margin:0;font-weight:550;letter-spacing:0}.shell>main{padding-top:30px}footer{justify-content:flex-end;margin-top:24px}.history-panel{min-height:0}.empty-history{padding:48px 16px}.empty-history h3{margin:0 0 16px}.diagnostic-details{margin:0 0 16px;color:#a4b7ac;font-size:12px}.diagnostic-details>summary{cursor:pointer;padding:12px 0}.diagnostic-body{padding:12px 0 0}.diagnostic-body .poll-status{margin-top:14px}.compact-diagnostics{display:block;margin-top:8px}.compact-diagnostics .detail-panel{width:100%}.session-toolbar{margin-top:8px}.setting-row{padding-top:14px;padding-bottom:14px}.appearance-preview{margin-top:18px}.appearance-caption{font-size:11px}.rate-summary{font-size:11px}.work-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+
+.app-quit{margin-left:14px}

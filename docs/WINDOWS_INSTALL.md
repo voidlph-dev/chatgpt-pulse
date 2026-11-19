@@ -1,21 +1,21 @@
 # Windows 安装与音乐律动
 
-当前公开测试版：0.18.2 x64。安装器保持 Windows 交接验收的原字节；实际验收范围见随包 `WINDOWS_MUSIC_REPORT.md`。仓库后续共享窗口维护已通过云端编译，但未回编进入这些原安装器。
+当前公开测试版：0.18.4 x64，修复音频开启时退出卡死。在线/离线安装器由 Windows 云端构建，原生退出与安装后回归范围见 `WINDOWS_EXIT_FIX_VALIDATION.json` 及 [修复说明](WINDOWS_EXIT_FIX_0.18.4.md)。原用户机器与 Windows 10 仍需复测。
 
 ## 下载与校验
 
-[ChatGPT-Pulse-0.18.2-windows-x64-music-offline-setup.exe](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.3/ChatGPT-Pulse-0.18.2-windows-x64-music-offline-setup.exe)
+[ChatGPT-Pulse-0.18.4-windows-x64-music-offline-setup.exe](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.4/ChatGPT-Pulse-0.18.4-windows-x64-music-offline-setup.exe)
 
-[ChatGPT-Pulse-0.18.2-windows-x64-music-online-setup.exe](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.3/ChatGPT-Pulse-0.18.2-windows-x64-music-online-setup.exe)
+[ChatGPT-Pulse-0.18.4-windows-x64-music-online-setup.exe](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.4/ChatGPT-Pulse-0.18.4-windows-x64-music-online-setup.exe)
 
-[SHA256SUMS.txt](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.3/SHA256SUMS.txt)
+[SHA256SUMS.txt](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.4/SHA256SUMS.txt)
 
 在 PowerShell 执行 `Get-FileHash -Algorithm SHA256 .\下载的安装包.exe`，将结果与 SHA256SUMS.txt 中同名文件比较。
 
 ## 选择安装器
 
-- 默认完整离线版：`ChatGPT-Pulse-0.18.2-windows-x64-music-offline-setup.exe`，包含微软完整 WebView2 安装组件。
-- 小体积联网版：`ChatGPT-Pulse-0.18.2-windows-x64-music-online-setup.exe`，缺少 WebView2 时需从微软联网补齐。
+- 默认完整离线版：`ChatGPT-Pulse-0.18.4-windows-x64-music-offline-setup.exe`，包含微软完整 WebView2 安装组件。
+- 小体积联网版：`ChatGPT-Pulse-0.18.4-windows-x64-music-online-setup.exe`，缺少 WebView2 时需从微软联网补齐。
 
 两版主程序相同，只需安装一种。安装面向当前用户，无需 Node、Rust、Python、Visual Studio、额外 SQLite、FFmpeg 或音频驱动。已有 WebView2 时复用；离线仅指安装依赖，无兼容本地日志的云端 Work 仍不受支持。
 
@@ -27,7 +27,7 @@
 
 音乐采集需要 Windows 10 1703 或更新系统。系统混音可能包含歌曲、视频、游戏与通话等声音；不识别曲名、歌词或情绪，受保护音频可能无法取得。曲线是频谱，镜像不表示独立双声道。没有声音时保持静音状态，恢复播放后自动响应；真正故障会说明状态并提供重试。
 
-人物只在程序成功扫描日志、且扫描范围内没有未完成或异常任务时允许随音乐轻动。“没有检测到”不等于 GPT 已空闲。工作、推理、工具、待操作、多任务、点击/拖动/对话、勿扰与减少动态效果均优先。关闭音乐会释放采集资源；退出可使用托盘菜单。
+人物只在程序成功扫描日志、且扫描范围内没有未完成或异常任务时允许随音乐轻动。“没有检测到”不等于 GPT 已空闲。工作、推理、工具、待操作、多任务、点击/拖动/对话、勿扰与减少动态效果均优先。关闭音乐会释放采集资源；退出可使用托盘菜单或主窗口底部“退出软件”。若旧版已经卡死，可先在任务管理器结束 ChatGPT Pulse，再运行新版安装器；无需删除设置目录。
 
 ## Work 与用量
 
@@ -39,4 +39,4 @@ Token 直接来自日志，不估算、不额外派发模型任务。没有任�
 
 使用 Windows“已安装的应用”或安装目录中的卸载器。默认保留用户数据；不要为了排查问题手动删除设置目录。安装器和源包不携带个人日志、凭据或设置数据库。
 
-现有非商用许可与素材说明保持不变，完整文本和第三方许可随程序及源码提供。安装器从 GitHub 0.18.2 Release 下载，源码与安装器的来源分别见发布说明。异机、物理音频设备切换和独立标准用户账户等未测项，以随包报告为准。
+现有非商用许可与素材说明保持不变，完整文本和第三方许可随程序及源码提供。安装器从 GitHub 最新 Release 下载，源码与两端安装器的版本、来源分别见发布说明。异机、物理音频设备切换和独立标准用户账户等未测项，以随包报告为准。

@@ -40,7 +40,7 @@ jobs:
           name: browser-check-results
           path: test-results/
   windows:
-    name: Windows x64 compile check
+    name: Windows x64 build and native exit checks
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -56,3 +56,13 @@ jobs:
       - run: pnpm test
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - run: pnpm tauri build --no-bundle
+      - run: node scripts/test-native-exit.mjs
+      - run: node scripts/package-windows-exit-fix.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-exit-fix-candidate
+          path: |
+            src-tauri/target/release/chatgpt-pulse.exe
+            test-results/native-exit/result.json
+            release/windows-exit-fix/*

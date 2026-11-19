@@ -14,6 +14,7 @@
   import {defaults,emptySample,number,linePath,rateDisplay,pollLabel,statusDisplay,eventLabel,duration,acceptSample,acceptSettings,pulseCells,completionDisplay} from './lib/domain.js';
   const overlay=new URLSearchParams(location.search).has('overlay');
   let tab='overview', settings={...defaults}, sample=emptySample(), history=[], values=[], error='', busy=false, platform='macos', shortcutError=null;
+  let quitting=false;
   let disposed=false,historyRequest=0,clearingHistory=false,offlineTest=false;
   let source='logs', logs=[], selectedLog='', lastMeasurement=null,clock=Date.now(),startup={installed:false,loaded:false,supported:false};
   $: displayedRate=rateDisplay(sample,clock);
@@ -65,6 +66,7 @@
   async function control(action){busy=true;error='';values=[];try{receive(await call('control',{action,logId:action==='live'?selectedLog:null}));if(action==='pause')await refreshHistory();}catch(e){error=String(e);}finally{busy=false;}}
   async function change(key,value){error='';try{receiveSettings(await call('patch_settings',{key,value,pinnedLog:key==='follow_latest'&&!value?(sample.log_id||selectedLog||null):null}));return true;}catch(e){error=String(e);return false;}}
   async function setWatch(enabled){error='';busy=true;try{startup=await call('set_client_watch',{enabled});}catch(e){error=String(e);}finally{busy=false;}}
+  async function quit(){if(quitting)return;quitting=true;error='';try{await call('quit_app');}catch(e){quitting=false;error=String(e);}}
   async function clear(){if(clearingHistory)return;clearingHistory=true;historyRequest++;try{await call('clear_history');history=[];}catch(e){error=String(e);}finally{clearingHistory=false;}}
   async function finishEdit(cancel=false){try{const locked=await call('overlay_edit',{editing:false,cancel});settings={...settings,locked};}catch(e){error=String(e);}}
   async function edit(){try{await call('overlay_edit',{editing:true});settings={...settings,locked:false,overlay_enabled:true};}catch(e){error=String(e);}}
@@ -120,7 +122,7 @@
       <section class="panel settings-panel"><h2>采样与隐私</h2><div class="setting-row"><div><b>保留本地记录</b><p>保存已结束任务的数字摘要</p></div><input aria-label="保留本地记录" type="checkbox" checked={settings.keep_history} onchange={e=>change('keep_history',e.currentTarget.checked)}/></div><div class="setting-row"><div><b>保留天数</b></div><select aria-label="保留天数" value={String(settings.retention_days)} onchange={e=>change('retention_days',Number(e.currentTarget.value))}><option value="1">1 天</option><option value="7">7 天</option><option value="30">30 天</option></select></div><div class="setting-row"><div><b>自动适应日志节奏</b><p>根据上报节奏调整速率保留时间</p></div><input aria-label="自动适应日志节奏" type="checkbox" checked={settings.adaptive_retention} onchange={e=>change('adaptive_retention',e.currentTarget.checked)}/></div><div class="setting-row"><div><b>完成结算卡</b><p>结束时显示任务摘要</p></div><input aria-label="完成结算卡" type="checkbox" checked={settings.completion_card} onchange={e=>change('completion_card',e.currentTarget.checked)}/></div><div class="setting-row"><div><b>无活动后隐藏旧速率</b><p>到期隐藏旧速率</p></div><select aria-label="无活动后隐藏旧速率" value={String(settings.rate_idle_seconds??30)} onchange={e=>change('rate_idle_seconds',Number(e.currentTarget.value))}><option value="15">15 秒</option><option value="30">30 秒（默认）</option><option value="60">60 秒</option><option value="120">120 秒</option></select></div><div class="setting-row"><div><b>采样间隔</b></div><select aria-label="采样间隔" value={String(settings.interval_ms)} onchange={e=>change('interval_ms',Number(e.currentTarget.value))}><option value="500">0.5 秒</option><option value="1000">1 秒</option><option value="2000">2 秒</option><option value="3000">3 秒</option></select></div></section>
 
     {/if}
-    <footer><span>v{version}</span></footer>
+    <footer><span>v{version}</span>{#if native}<button class="quiet app-quit" data-quit-app disabled={quitting} onclick={quit}>{quitting?'正在退出…':'退出软件'}</button>{/if}</footer>
   </main>
 </div>
 {/if}

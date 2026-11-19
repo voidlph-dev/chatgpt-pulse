@@ -55,6 +55,12 @@ try{
  const overlay=await context.newPage();overlay.on('pageerror',e=>errors.push(String(e)));await overlay.setViewportSize({width:280,height:144});await overlay.goto('http://127.0.0.1:1420/?overlay',{waitUntil:'networkidle'});await overlay.locator('.music-spectrum.audible').waitFor();
  for(const [id]of spectrumStyles){
   await main.getByLabel('频谱样式',{exact:true}).selectOption(id);await overlay.waitForFunction(style=>document.querySelector('.music-spectrum')?.dataset.mode===style,id);await overlay.waitForTimeout(350);
+  // A busy runner can start the CSS fade after the nominal 350 ms delay.
+  // Assert the completed state, retaining the exact opacity requirement.
+  if(id==='dots'||id==='curve')await overlay.waitForFunction(mode=>{
+   const layer=document.querySelector(mode==='dots'?'.frequency-dots':'.frequency-curve');
+   return layer&&getComputedStyle(layer).opacity==='1';
+  },id,{timeout:3000});
   const result=await overlay.locator('.music-spectrum').evaluate(el=>({lines:[...el.querySelectorAll('[data-band]')].filter(l=>l.getAttribute('visibility')!=='hidden').map(l=>({top:Math.min(Number(l.getAttribute('y1')),Number(l.getAttribute('y2'))),bottom:Math.max(Number(l.getAttribute('y1')),Number(l.getAttribute('y2')))})),curve:el.querySelector('[data-curve]').getAttribute('d'),dotsOpacity:getComputedStyle(el.querySelector('.frequency-dots')).opacity,curveOpacity:getComputedStyle(el.querySelector('.frequency-curve')).opacity,firstColor:el.querySelector('[data-band]').getAttribute('stroke'),peakOpacity:[...el.querySelectorAll('[data-peak]')].map(p=>p.getAttribute('opacity')),pointer:getComputedStyle(el).pointerEvents}));
   assert.equal(result.lines.length,12);assert.ok(result.lines.every(l=>l.top>=117.8&&l.bottom<=134.01),JSON.stringify({id,result}));assert.ok(!/NaN|Infinity/.test(result.curve));assert.equal(result.pointer,'none');assert.equal(result.firstColor,'#ff8800');assert.ok(result.peakOpacity.every(v=>Number(v)===0));
   if(id==='dots')assert.equal(result.dotsOpacity,'1');if(id==='curve')assert.equal(result.curveOpacity,'1');
