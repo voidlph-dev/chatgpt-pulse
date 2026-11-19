@@ -23,20 +23,22 @@ impl AudioFrame {
 }
 pub struct Music(Arc<Inner>);
 struct Inner {
-    wanted: AtomicBool, epoch: AtomicU64, frame: Mutex<AudioFrame>,
+    wanted: AtomicBool, stopping: AtomicBool, epoch: AtomicU64, frame: Mutex<AudioFrame>,
     worker: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 impl Default for Music {
     fn default() -> Self {
         let supported=native::supported();
-        Self(Arc::new(Inner {wanted:AtomicBool::new(false),epoch:AtomicU64::new(0),worker:Mutex::new(None),
+        Self(Arc::new(Inner {wanted:AtomicBool::new(false),stopping:AtomicBool::new(false),epoch:AtomicU64::new(0),worker:Mutex::new(None),
             frame:Mutex::new(AudioFrame::status(if supported {"off"} else {"unsupported"},if supported {"未启用系统音频"} else {if cfg!(target_os="windows"){"音乐律动需要 Windows 10 1703 或更新系统；其他功能不受影响"}else{"音乐律动需要 macOS 14.2 或更新版本；其他功能不受影响"}},supported,0))}))
     }
 }
 impl Music {
     pub fn snapshot(&self)->AudioFrame { self.0.frame.lock().unwrap().clone() }
     pub fn request(&self, app:tauri::AppHandle, enabled:bool) {
-        let inner=self.0.clone();let epoch=inner.epoch.fetch_add(1,Ordering::SeqCst)+1;
+        let inner=self.0.clone();
+        if inner.stopping.load(Ordering::SeqCst) {return;}
+        let epoch=inner.epoch.fetch_add(1,Ordering::SeqCst)+1;
         inner.wanted.store(enabled,Ordering::SeqCst);
         let state=AudioFrame::status(if enabled {"starting"} else {"off"},if enabled {if cfg!(target_os="macos"){"正在启动系统音频；请查看 macOS 授权提示"}else{"正在连接默认系统播放设备"}} else {"已关闭系统音频"},native::supported(),epoch);
         publish(&app,&inner,state,true);
@@ -45,21 +47,28 @@ impl Music {
         std::thread::spawn(move||{
             let mut worker=inner.worker.lock().unwrap();
             if let Some(old)=worker.take(){let _=old.join();}
-            if inner.epoch.load(Ordering::SeqCst)!=epoch || !inner.wanted.load(Ordering::SeqCst){return;}
+            if inner.stopping.load(Ordering::SeqCst) || inner.epoch.load(Ordering::SeqCst)!=epoch || !inner.wanted.load(Ordering::SeqCst){return;}
             let capture_inner=inner.clone();
             *worker=Some(std::thread::spawn(move||capture(app,capture_inner,epoch)));
         });
     }
-    pub fn shutdown(&self) {
+    pub fn shutdown(&self) -> std::sync::mpsc::Receiver<()> {
+        self.0.stopping.store(true,Ordering::SeqCst);
         self.0.wanted.store(false,Ordering::SeqCst);self.0.epoch.fetch_add(1,Ordering::SeqCst);
-        // Mac ExitRequested runs on the event thread. Capture can still be
-        // dispatching a window visibility query there; never join it on that
-        // same thread. Settings-off still joins asynchronously in request().
-        #[cfg(not(target_os="macos"))]
-        if let Some(worker)=self.0.worker.lock().unwrap().take(){let _=worker.join();}
+        // Tauri window getters wait for the event thread on Windows too. Neither
+        // the worker mutex (a toggle may hold it while joining) nor join itself
+        // may be waited on by ExitRequested. Keep the event loop pumping until
+        // capture drops its COM/Core Audio objects on its own thread.
+        let inner=self.0.clone();let (done,finished)=std::sync::mpsc::channel();
+        std::thread::spawn(move||{
+            if let Some(worker)=inner.worker.lock().unwrap().take(){let _=worker.join();}
+            let _=done.send(());
+        });
+        finished
     }
 }
 fn publish(app:&tauri::AppHandle,inner:&Inner,mut frame:AudioFrame,status:bool) {
+    if inner.stopping.load(Ordering::SeqCst) {return;}
     frame.view_visible=app.get_webview_window("overlay").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(false));
     {
         let mut latest=inner.frame.lock().unwrap();
@@ -96,12 +105,26 @@ impl StartupWarmup {
     }
 }
 fn capture(app:tauri::AppHandle,inner:Arc<Inner>,epoch:u64) {
+    // Deterministic isolated regression: queue Quit before a worker's real
+    // window getter. The former Windows UI-thread join deadlocked at this point.
+    // No real audio is opened in this fixture and it cannot run in user mode.
+    if std::env::var_os("PULSE_OFFLINE_TEST").is_some()
+        && std::env::var_os("PULSE_RENDER_PROBE").is_some()
+        && std::env::var_os("PULSE_TEST_EXIT_UI_RACE").is_some() {
+        let (reply,wait)=std::sync::mpsc::channel();let handle=app.clone();
+        if app.run_on_main_thread(move||{handle.exit(0);let _=reply.send(());}).is_ok()
+            && wait.recv_timeout(Duration::from_secs(5)).is_ok() {
+            let answered=app.get_webview_window("overlay").is_some_and(|w|w.is_visible().is_ok());
+            crate::write_test_probe(&app,"exit-race",serde_json::json!({"window_query_answered":answered,"synthetic_capture":true}));
+        }
+        return;
+    }
     let mut stream:Option<native::Stream>=None;
     let mut analyzer=Analyzer::default();let mut pcm=[0f32;8192];
     let mut last=Instant::now();let mut health=last;let mut last_data=last;
     let mut connected=last;let mut sequence=0;let mut failures=0;
     let mut previous=String::new();let mut callbacks=0;let mut warmup=StartupWarmup::default();
-    while inner.wanted.load(Ordering::SeqCst)&&inner.epoch.load(Ordering::SeqCst)==epoch {
+    while !inner.stopping.load(Ordering::SeqCst)&&inner.wanted.load(Ordering::SeqCst)&&inner.epoch.load(Ordering::SeqCst)==epoch {
         if stream.is_none() {
             match native::Stream::open() {
                 Ok(opened)=>{stream=Some(opened);analyzer=Analyzer::default();last=Instant::now();health=last;last_data=last;connected=last;callbacks=0;previous.clear();}
@@ -161,7 +184,7 @@ fn retry_delay(failures:u32)->Duration {Duration::from_millis(250u64.saturating_
 fn retry_wait(inner:&Inner,epoch:u64,delay:Duration)->bool {
     let until=Instant::now()+delay;
     while Instant::now()<until {
-        if !inner.wanted.load(Ordering::SeqCst)||inner.epoch.load(Ordering::SeqCst)!=epoch{return false;}
+        if inner.stopping.load(Ordering::SeqCst)||!inner.wanted.load(Ordering::SeqCst)||inner.epoch.load(Ordering::SeqCst)!=epoch{return false;}
         std::thread::sleep(Duration::from_millis(40).min(until.saturating_duration_since(Instant::now())));
     }true
 }
@@ -252,6 +275,34 @@ pub fn confirmed_idle(sample:&crate::data::Sample,now:i64,since:i64)->bool {
 #[cfg(test)]
 mod tests {
     use super::*;use crate::data::Sample;
+    #[test]
+    fn shutdown_keeps_ui_free_until_capture_can_release_on_its_owner_thread() {
+        let music=Music::default();
+        let (ui_reply,ui_wait)=std::sync::mpsc::channel();
+        let (released,release_wait)=std::sync::mpsc::channel();
+        *music.0.worker.lock().unwrap()=Some(std::thread::spawn(move||{
+            // Model a window getter already waiting for the UI event loop.
+            ui_wait.recv_timeout(Duration::from_secs(5)).unwrap();
+            released.send(std::thread::current().id()).unwrap();
+        }));
+        let finished=music.shutdown();
+        assert!(!music.0.wanted.load(Ordering::SeqCst));
+        assert!(music.0.stopping.load(Ordering::SeqCst));
+        assert!(finished.try_recv().is_err(),"Capture is still waiting for a UI reply");
+        // Only possible when shutdown returned without joining on this thread.
+        ui_reply.send(()).unwrap();
+        finished.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_ne!(release_wait.recv().unwrap(),std::thread::current().id());
+    }
+    #[test]
+    fn shutdown_does_not_wait_on_toggle_reconciliation_mutex_on_ui_thread() {
+        let music=Music::default();
+        let toggle=music.0.worker.lock().unwrap();
+        let finished=music.shutdown();
+        assert!(finished.try_recv().is_err());
+        drop(toggle);
+        finished.recv_timeout(Duration::from_secs(2)).unwrap();
+    }
     fn ended()->Sample {Sample {music_scan_complete:true,state:"completed".into(),source:"logs".into(),log_id:Some("a.jsonl".into()),checked_at:Some(4000),activity_at:Some(1000),..Sample::default()}}
     #[test] fn cold_zero_pcm_retries_are_bounded_and_stop_after_real_data() {
         let mut warmup=StartupWarmup::default();

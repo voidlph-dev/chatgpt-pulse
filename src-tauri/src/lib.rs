@@ -6,6 +6,7 @@ mod audio_format;
 #[cfg(target_os = "windows")]
 mod wasapi;
 mod music;
+mod lifecycle;
 mod spectrum;
 mod activity;
 mod avatar;
@@ -559,6 +560,14 @@ fn show_main(app: tauri::AppHandle) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "main" { return Err("请从主窗口或托盘菜单退出".into()); }
+    write_test_probe(&app,"quit-command",serde_json::json!({"window":window.label()}));
+    app.exit(0);
+    Ok(())
+}
 #[tauri::command]
 fn overlay_edit(
     app: tauri::AppHandle,
@@ -863,7 +872,7 @@ fn isolated_ui_control(app: &tauri::AppHandle) {
     let Ok(bytes)=std::fs::read(&file) else{return;};let _=std::fs::remove_file(file);
     let Ok(value)=serde_json::from_slice::<serde_json::Value>(&bytes) else{return;};
     let Some(nonce)=value["nonce"].as_u64() else{return;};
-    let Some(action)=value["action"].as_str().filter(|a|matches!(*a,"audio-off"|"audio-on"|"hide"|"show"|"minimize"|"restore"|"inspect")) else{return;};
+    let Some(action)=value["action"].as_str().filter(|a|matches!(*a,"audio-off"|"audio-on"|"hide"|"show"|"minimize"|"restore"|"inspect"|"close-main"|"quit-button"|"quit"|"quit-twice")) else{return;};
     let action=action.to_string();let handle=app.clone();
     let _=app.run_on_main_thread(move||{
         let result=(||->Result<(),String>{
@@ -872,6 +881,13 @@ fn isolated_ui_control(app: &tauri::AppHandle) {
                 let enabled=matches!(action.as_str(),"audio-on"|"show");
                 patch_settings(handle.clone(),handle.state::<Pulse>(),key.into(),serde_json::json!(enabled),None)?;
                 if action=="audio-on" {let main=handle.get_webview_window("main").ok_or("No fixture main window")?;music::music_start(handle.clone(),main)?;}
+            } else if matches!(action.as_str(),"quit"|"quit-twice") {
+                handle.exit(0);
+                if action=="quit-twice" {handle.exit(0);}
+            } else if matches!(action.as_str(),"close-main"|"quit-button") {
+                let window=handle.get_webview_window("main").ok_or("No fixture main window")?;
+                if action=="close-main" {window.close().map_err(|e|e.to_string())?;}
+                else {window.eval("document.querySelector('[data-quit-app]')?.click()").map_err(|e|e.to_string())?;}
             } else if let Some(window)=handle.get_webview_window("overlay") {
                 if action=="minimize" {window.minimize().map_err(|e|e.to_string())?;}
                 if action=="restore" {window.unminimize().map_err(|e|e.to_string())?;}
@@ -880,7 +896,8 @@ fn isolated_ui_control(app: &tauri::AppHandle) {
             Ok(())
         })();
         let minimized=handle.get_webview_window("overlay").and_then(|w|w.is_minimized().ok());
-        write_test_probe(&handle,"control",serde_json::json!({"nonce":nonce,"action":action,"error":result.err(),"minimized":minimized}));
+        let main_visible=handle.get_webview_window("main").and_then(|w|w.is_visible().ok());
+        write_test_probe(&handle,"control",serde_json::json!({"nonce":nonce,"action":action,"error":result.err(),"minimized":minimized,"main_visible":main_visible}));
     });
 }
 fn sampler(app: tauri::AppHandle) {
@@ -1451,6 +1468,7 @@ pub fn run() -> Result<(), String> {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
+            quit_app,
             music::music_status,
             music::music_start,
             bootstrap,
@@ -1652,16 +1670,33 @@ pub fn run() -> Result<(), String> {
         })
         .build(tauri::generate_context!())
         .map_err(|error| error.to_string())?;
-    app.run(|app, event| {
+    let exit_flow=Arc::new(lifecycle::ExitFlow::default());
+    app.run(move |app, event| {
             #[cfg(target_os = "macos")]
             if matches!(event, tauri::RunEvent::Reopen { .. }) {
                 let _ = show_main(app.clone());
             }
-            if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
-                let state = app.state::<Pulse>();
-                app.state::<music::Music>().shutdown();
-                state.mode.store(0, Ordering::SeqCst);
-                state.epoch.fetch_add(1, Ordering::SeqCst);
+            if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
+                match exit_flow.requested() {
+                    lifecycle::ExitAction::Finish => {},
+                    lifecycle::ExitAction::Wait => api.prevent_exit(),
+                    lifecycle::ExitAction::Begin => {
+                        api.prevent_exit();
+                        let state = app.state::<Pulse>();
+                        state.mode.store(0, Ordering::SeqCst);
+                        state.epoch.fetch_add(1, Ordering::SeqCst);
+                        let finished=app.state::<music::Music>().shutdown();
+                        let handle=app.clone();let flow=exit_flow.clone();
+                        std::thread::spawn(move||{
+                            // A broken audio driver must not hold Quit forever.
+                            // The event loop stays available for normal cleanup;
+                            // after the deadline Tauri performs its normal exit.
+                            let cleaned=finished.recv_timeout(Duration::from_secs(3)).is_ok();
+                            write_test_probe(&handle,"exit",serde_json::json!({"audio_released":cleaned,"code":code.unwrap_or(0)}));
+                            flow.ready();handle.exit(code.unwrap_or(0));
+                        });
+                    }
+                }
             }
         });
     Ok(())
