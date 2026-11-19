@@ -41,15 +41,15 @@ Captured from the **0.16.6 Mac desktop application**, using the built-in demo or
 
 ## Downloads and support
 
-Latest macOS fix: **0.18.3**; Windows remains the validated **0.18.2** music build. Downloads are provided through [GitHub Releases](https://github.com/voidlph-dev/chatgpt-pulse/releases/tag/v0.18.3).
+Latest downloads: **Windows 0.18.4 Quit fix / macOS 0.18.3**. Downloads are provided through [GitHub Releases](https://github.com/voidlph-dev/chatgpt-pulse/releases/tag/v0.18.4).
 
 | Platform | Package | Verification scope |
 |---|---|---|
-| macOS 13.3+ | [`ChatGPT-Pulse-0.18.3-mac-universal.dmg`](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.3/ChatGPT-Pulse-0.18.3-mac-universal.dmg) | Universal Apple Silicon / Intel binary; see [Mac acceptance](docs/MAC_ACCEPTANCE.md) for actual tests |
-| Windows x64 | [`ChatGPT-Pulse-0.18.2-windows-x64-music-offline-setup.exe`](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.3/ChatGPT-Pulse-0.18.2-windows-x64-music-offline-setup.exe) | Offline installer including WebView2 setup; tested on the handoff machine only |
-| Windows x64, online | [`ChatGPT-Pulse-0.18.2-windows-x64-music-online-setup.exe`](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.3/ChatGPT-Pulse-0.18.2-windows-x64-music-online-setup.exe) | Smaller alternative; internet needed for missing WebView2 |
+| macOS 13.3+ | [`ChatGPT-Pulse-0.18.3-mac-universal.dmg`](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.4/ChatGPT-Pulse-0.18.3-mac-universal.dmg) | Universal Apple Silicon / Intel binary; see [Mac acceptance](docs/MAC_ACCEPTANCE.md) for actual tests |
+| Windows x64 | [`ChatGPT-Pulse-0.18.4-windows-x64-music-offline-setup.exe`](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.4/ChatGPT-Pulse-0.18.4-windows-x64-music-offline-setup.exe) | Offline installer including WebView2 setup; cloud native-quit and installed-binary regression checks; user-machine retest pending |
+| Windows x64, online | [`ChatGPT-Pulse-0.18.4-windows-x64-music-online-setup.exe`](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.4/ChatGPT-Pulse-0.18.4-windows-x64-music-online-setup.exe) | Smaller alternative; internet needed for missing WebView2 |
 
-Checksums: [SHA256SUMS](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.3/SHA256SUMS.txt). See the [Windows verification steps](docs/WINDOWS_INSTALL.md#下载与校验).
+Checksums: [SHA256SUMS](https://github.com/voidlph-dev/chatgpt-pulse/releases/download/v0.18.4/SHA256SUMS.txt). See the [Windows verification steps](docs/WINDOWS_INSTALL.md#下载与校验).
 
 On macOS, open the DMG and drag the app to Applications. On Windows, install one of the two EXEs. End users do not need Node.js, Rust, Python or a development server. The Mac candidate is ad hoc signed and not notarized; Windows installers are unsigned. Check [Mac installation](docs/MAC_INSTALL.md) or [Windows installation](docs/WINDOWS_INSTALL.md) before testing.
 
@@ -57,7 +57,7 @@ On macOS, open the DMG and drag the app to Applications. On Windows, install one
 
 The candidate adds local system-output visualization (Core Audio on macOS 14.2+, WASAPI loopback on Windows 10 1703+), six spectrum styles, shareable custom presets and low-priority idle portrait motion/dialogue. Capture is opt-in; no microphone, captured-audio files or upload. Work and interaction always take priority.
 
-The download links above provide the music edition. Mac upgrades from 0.16.6 use a separate settings identity: reconfigure preferences and audio consent; previous data is preserved. Windows installers are the validated handoff binaries; subsequent shared-window maintenance in the repository has passed cloud compilation but has not been repackaged into those installers. See [the integration and validation notes](docs/RELEASE_0.18.2.zh-CN.md). Mac and Windows hardware/test limits remain separate.
+The download links above provide the music edition. Mac upgrades from 0.16.6 use a separate settings identity: reconfigure preferences and audio consent; previous data is preserved. Windows 0.18.4 fixes the audio shutdown deadlock and adds a Quit button to the main window. Native exit and installed-binary checks run on a hosted Windows x64 runner; Windows 10, the reporting user’s PC, and real playback/device changes still need retesting. See [the release and validation notes](docs/RELEASE_0.18.4.zh-CN.md). Mac and Windows hardware/test limits remain separate.
 
 ## Features
 

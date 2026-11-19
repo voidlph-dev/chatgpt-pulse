@@ -94,5 +94,17 @@ class UnifiedLatestReleaseDownloadsTests(MusicReleaseDownloadsTests):
         self.release['tag_name']='v0.18.3';self.update_assets()
 
 
+class WindowsExitHotfixDownloadsTests(MusicReleaseDownloadsTests):
+    def setUp(self):
+        super().setUp()
+        self.base=f'https://github.com/{release_check.REPOSITORY}/releases/download/v0.18.4/'
+        self.payloads={
+            'ChatGPT-Pulse-0.18.4-windows-x64-music-offline-setup.exe':b'MZoffline-fixture',
+            'ChatGPT-Pulse-0.18.4-windows-x64-music-online-setup.exe':b'MZonline-fixture',
+        }
+        self.payloads['SHA256SUMS.txt']=''.join(hashlib.sha256(body).hexdigest()+'  '+name+'\n' for name,body in self.payloads.items()).encode()
+        self.release['tag_name']='v0.18.4';self.update_assets()
+
+
 if __name__ == '__main__':
     unittest.main()

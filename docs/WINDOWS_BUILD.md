@@ -37,4 +37,6 @@ cargo test --manifest-path src-tauri/Cargo.toml --locked local_metadata_check --
 
 源码包采用公开文件白名单，并逐项校验解包内容、敏感文件排除规则和 SHA-256。发布前仍需处理素材授权；本轮没有更换许可证、上传仓库或开启自动发布。
 
-0.18.2 当前源码已在 Mac 选择性合并；Windows 安装器保留交付时的原始名称、字节和校验值，不在 Mac 上重新封装。窗口和音频公共文件的 Mac 回归不代替 Windows 二进制重建。详情见 [两端整合说明](RELEASE_0.18.2.zh-CN.md)。
+历史 0.18.2 源码已在 Mac 选择性合并；Windows 安装器保留交付时的原始名称、字节和校验值，不在 Mac 上重新封装。窗口和音频公共文件的 Mac 回归不代替 Windows 二进制重建。详情见 [两端整合说明](RELEASE_0.18.2.zh-CN.md)。
+
+0.18.4 退出修复回归：先构建 `pnpm tauri build --no-bundle`，再运行 `node scripts/test-native-exit.mjs`。Windows 默认在隔离测试设置中开启系统音频，只能在同意本机音频测试后使用；`--skip-audio` 可只跑不采集真实音频的场景。Windows CI 在此基础上执行 `node scripts/package-windows-exit-fix.mjs`，生成两种候选并在临时安装后重跑；这不等同于 Windows 10/异机/干净系统已验收。见 [退出修复说明](WINDOWS_EXIT_FIX_0.18.4.md)。
